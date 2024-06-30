@@ -1,0 +1,311 @@
+---
+title: ""
+
+output: html_document
+---
+
+<center><img src="https://i.imgur.com/YNtjmbq.png" width="800"></center> 
+
+
+# Lab 5 - Comunidades en las Redes
+
+## Carga de datos
+
+Usemos de nuevo los datos de los innovadores en Seattle: 
+
+<iframe width="800" height="400" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vQaaNQb2frjnlt0fPSBQhp5tNydB0a9ibp98sblBn6OfvGd8vsx8cfHb4w8Cm_qC3EIeYFby_zNQBoK/pubhtml?">
+</iframe>
+
+Como se ve, tenemos la matriz de adyacencia, la cual abriremos esta vez en R:
+```{r}
+# limpiar memoria
+rm(list = ls())
+
+# abrir red
+adjacency=read.csv('data/seattleTop_adjMx.csv',row.names = 1) # la tabla tiene este nombre
+matrix <- as.matrix(adjacency) 
+
+# abrir atributos
+attributes=read.csv('data/seattleTop_attrTbl.csv') # la tabla tiene este nombre
+```
+
+En R, es común usar **igraph** para análisis básicos de redes. Creamos primero la red usando la matriz de adyacencia:
+
+```{r}
+library(igraph)
+topsNet <- graph_from_adjacency_matrix(matrix, mode="directed",weighted = TRUE) 
+summary(topsNet)
+```
+Como se ve, _igraph_ nos informa que se ha creado la red asignándole un código (irrelevante), que es una red dirigida (**DNW**, la W indica que ha creado pesos en los enlaces), con 46 nodos y 588 enlaces. Indica que tiene un atributo **name** para los **v**értices (nodos) de tipo **c**áracter (texto), y que los **e**nlaces (edges) tienen un atributo **weight** de tipo **n**umérico.  
+
+Como tenemos una tabla con más atributos para los nodos, podemos añadirlos fácilmente:
+
+
+```{r}
+V(topsNet)$male <- attributes$male
+V(topsNet)$popularity <- attributes$followers
+
+# ahora
+summary(topsNet)
+```
+Ya están los nuevos atributos para vértices, **popularity** y **male**, ambos de tipo **n**umérico.
+
+Recordemos que nuestra red de Seattletonians:
+
+* No todos los nodos pueden llegar a otro nodo:
+
+```{r}
+is_connected(topsNet,mode = c("strong"))
+```
+* Hay algunos grupos de nodos que sí pueden alcanzarse entre sí:
+
+```{r}
+count_components(topsNet, mode = c("strong"))
+```
+* Estos son los que pueden alcanzarse entre sí:
+```{r}
+g_comp=igraph::components(topsNet, mode = c("strong"))
+g_comp
+
+```
+Guardemos la membresía a esos componentes como un atributo del nodo:
+```{r}
+V(topsNet)$component=g_comp$membership
+```
+
+Vemos que uno de los componentes _strongly_ connected es muy numeroso. Para efectos prácticos, quedémonos con ese:
+
+```{r}
+# seleccionando
+nodes_Subset=V(topsNet)[V(topsNet)$component==1]
+# filtrando red
+topsNet_giant=induced_subgraph(topsNet, nodes_Subset)
+
+# ahora:
+summary(topsNet_giant)
+```
+Veamos algunos valores importantes:
+
+* ¿Qué tan cerca está esta red _strongly_ connected de ser una red **complete**?
+```{r}
+edge_density(topsNet_giant)
+```
+
+* ¿Cuál es su diámetro y qué nodos son?
+```{r}
+farthest_vertices(topsNet_giant)
+```
+* ¿Qué tan recíproca es?
+```{r}
+reciprocity(topsNet_giant)
+```
+* ¿Qué tan probable es que dos nodos con un nodo en común también estén conectados?
+
+```{r}
+transitivity(topsNet_giant)
+```
+* ¿Qué tanta homofilia hay en la red?
+
+- Hacia los más conectados:
+
+```{r}
+assortativity_degree(topsNet_giant,directed = T)
+```
+- Hacia los del mismo sexo:
+
+```{r}
+assortativity(topsNet_giant, values=V(topsNet_giant)$male, directed = T)
+```
+
+- Hacia mismo nivel de popularidad:
+```{r}
+assortativity(topsNet_giant, values=V(topsNet_giant)$popularity, directed = T)
+```
+Para saber si esta red tiene comunidades, hay que explorar la presencia de cliques.
+
+# En busca de comunidades
+
+### El Clique
+
+El clique es un conjunto de nodos donde todos pueden conectarse con todos. Para este caso, usarameos la librería **statnet**.
+
+Como nuestra red la creamos con igraph, hay que convertirlo a gafo de statnet:
+
+```{r}
+topsNet_giant_net <- intergraph::asNetwork(topsNet_giant)
+topsNet_giant_net
+
+```
+
+Nuestro propósito aquí es saber si hay cliques:
+
+```{r}
+library(statnet)
+census <- clique.census(topsNet_giant_net)
+# aqui vemos
+census$clique.count
+
+```
+
+
+La cantidad de filas nos dice los tamaños de los cliques:
+
+-  Ningun clique de tamaño 1:
+```{r}
+census$clique.count[1,1]
+```
+
+-  10 cliques de tamaño 2:
+```{r}
+census$clique.count[2,1]
+```
+
+-  1 clique de tamaño 9:
+```{r}
+census$clique.count[9,1]
+```
+
+
+Si hay cliques, se sospecha la presencia de comunidades. 
+
+## Detección de comunidades
+
+1. Estrategia Divisiva (Top-Down): Veamos cómo se cálcula comunidades basadas en la intermediación, es decir comunidades que aparecen al remover los enlaces con alta intermediación:
+
+```{r}
+sort(edge_betweenness(topsNet_giant,directed = T),decreasing = T)[1:5]
+
+```
+
+```{r, fig.height=12}
+l=layout_with_fr(topsNet_giant)
+plot(topsNet_giant,layout=l,edge.arrow.size=1,vertex.label='',
+     edge.color=ifelse(edge_betweenness(topsNet_giant)>40,'red','grey90'))
+```
+El trabajo sería ir eliminando vertices hasta quedarse con la 'mejor' partición. Esto lo hace directamente el algoritmo the Girvan-Newman:
+
+```{r, warning=FALSE}
+topsNet_giant_GN <- cluster_edge_betweenness(topsNet_giant, directed=T)
+topsNet_giant_GN
+```
+Se indica que ha encontrado sólo dos comunidades. Nótese que indica que este resultado es el que dió la 'mejor" partición: la mejor **modularidad**:
+
+```{r}
+modularity(topsNet_giant_GN)
+```
+El detalle de las dos comunidades lo vemos así:
+
+```{r}
+communities(topsNet_giant_GN)
+```
+La pertenecia a cada grupo podemos guardarla como un atributo:
+
+```{r}
+V(topsNet_giant)$GNpartition=topsNet_giant_GN$membership
+```
+
+
+Veamos el resultado de manera gráfica:
+
+```{r, fig.height=10}
+l=layout_with_kk(topsNet_giant)
+
+plot(topsNet_giant_GN,topsNet_giant,rescale=T, layout=l,vertex.label='',edge.arrow.size=.2)
+```
+
+2. Estrategia Aglomerativa (BottomUp): Veamos el uso del algoritmo Louvain, un algoritmo que va agrupando a los nodos en pequenos grupos, deteniendose cuando la modularidad no mejora:
+
+
+```{r}
+topsNet_giant_LV=cluster_louvain(as.undirected(topsNet_giant,mode="mutual"))
+topsNet_giant_LV
+```
+
+Veamos la modularidad obtenida:
+```{r}
+modularity(topsNet_giant_LV)
+```
+Y las comunidades:
+```{r}
+communities(topsNet_giant_LV)
+```
+La pertenecia a cada grupo podemos guardarla nuevamente como un atributo del nodo:
+
+```{r}
+V(topsNet_giant)$LVpartition=topsNet_giant_LV$membership
+```
+
+Aqui de manera gráfica:
+
+```{r, fig.height=10}
+
+l=layout_with_kk(topsNet_giant)
+
+plot(topsNet_giant_LV,topsNet_giant,layout=l,vertex.label='',edge.arrow.size=.2)
+```
+
+# Revelando roles
+
+## Agujeros Estructurales
+
+Un tema clave es encontrar, en medio de todos los nodos, aquellos cuya posición y patrón de conexiones nos revele que tienen mejores condiciones para facilitar o restringir el flujo que se traslada por la red. Por ejemplo, podemos calcular cos tres nodes más claves siguiendo esa idea:
+
+```{r}
+#install.packages("influenceR", dependencies = TRUE)
+
+influenceR::keyplayer(topsNet_giant,3)
+```
+Alternativamente, podemos revelar quienes tienen menos restricciones en la red para lo mismo:facilitar o restringir el flujo que se traslada por la red. 
+
+```{r}
+sort(constraint(topsNet_giant))
+```
+
+Así, sabiendo que hay agujeros estrucrurales, podemos animarnos a asignar roles de _brokerage_.
+
+## Brokerage
+
+Pensemos en una red que tiene tres particiones A, B, y C, es decir, los nodos están en sólo una de ellas, podemos asignar los siguientes roles:
+
+* **El Coordinador**: Al que media la comunicacíon dentro de su propia partición, es decir, el coordinador **aCD** se ubica así: ai->aCD->aj, ai,aCD,aj pertenecen a A.
+
+* El **Consultor**: Al que media la comunicacíon dentro de otra partición, es decir, el consultor **bCT** se ubica así: ai->bCT->aj, ai,aj pertenecen a A, bCT pertenece a B.
+
+* El **Portero**: Al que permite que una partición ajena se comunique con su propia partición, es decir, el portero **bPT** se ubica así: ai->bPT->bj, ai pertenece a A, y bPT, y bj pertenecen a B.
+
+* El **Representante**: Al que se acerca a otra partición con información de su propia partición, es decir, el representante **aRP** se ubica así: ai->aRP->bj, ai, y aRP pertenecen a A, y bi pertenecen a B.
+
+* El Enlace (**liasion**): Al que media entre particiones diferentes, es decir, el liason **aLI** se ubica así: bi->aLI->cj, bi pertenece a B, cj pertenece a C, aLI pertenece a A.
+
+La librería **igraph** no calcula estos roles, pero si se puede con la librería **statnet**. Primero, se debe convertir la red de un formato a otro:
+
+```{r}
+#install.packages("intergraph")
+topsNet_giant_statnet <- intergraph::asNetwork(topsNet_giant)
+```
+
+Ahora, veamos los roles:
+
+```{r}
+library(statnet)
+brokerage(topsNet_giant_statnet,
+          cl=get.vertex.attribute(topsNet_giant_statnet, "LVpartition"))$raw.nli
+```
+Un poco de traducción:
+
+* El Coordinador: **w_I **
+
+* El Consultor: **w_O **
+
+* El Portero: **b_IO** 
+
+* El Representante:**b_OI** 
+
+* El Enlace (liasion): **b_O**
+
+Es decir: **rachelerman** ocupa 35 veces rol de _Coordinador_, 15 rol de _Consultor_,  85 de _Portero_, 100 de _Representante_, y  80 _liasion_.
+
+```{r}
+as_data_frame(topsNet_giant,what='vertices')
+as_data_frame(topsNet_giant,what='edges')
+```
