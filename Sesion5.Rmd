@@ -6,6 +6,11 @@ output: html_document
 
 <center><img src="https://i.imgur.com/YNtjmbq.png" width="800"></center> 
 
+<div class="alert alert-info" role="alert">
+## Data para la sesión
+Para esta sesión, los datos puedes descargarlos en _tu_ carpeta **data** desde este [enlace](https://drive.google.com/drive/folders/1I48Vani9iBX-AdEbXH-qCsbinH2t8oEj?usp=sharing).
+</div>
+
 
 # Lab 5 - Comunidades en las Redes
 
@@ -22,16 +27,16 @@ Como se ve, tenemos la matriz de adyacencia, la cual abriremos esta vez en R:
 rm(list = ls())
 
 # abrir red
-adjacency=read.csv('data/seattleTop_adjMx.csv',row.names = 1) # la tabla tiene este nombre
+adjacency=read.csv(file.path('data','seattleTop_adjMx.csv'),row.names = 1) # la tabla tiene este nombre
 matrix <- as.matrix(adjacency) 
 
 # abrir atributos
-attributes=read.csv('data/seattleTop_attrTbl.csv') # la tabla tiene este nombre
+attributes=read.csv(file.path('data','seattleTop_attrTbl.csv')) # la tabla tiene este nombre
 ```
 
 En R, es común usar **igraph** para análisis básicos de redes. Creamos primero la red usando la matriz de adyacencia:
 
-```{r}
+```{r, message=FALSE}
 library(igraph)
 topsNet <- graph_from_adjacency_matrix(matrix, mode="directed",weighted = TRUE) 
 summary(topsNet)
@@ -49,6 +54,13 @@ V(topsNet)$popularity <- attributes$followers
 summary(topsNet)
 ```
 Ya están los nuevos atributos para vértices, **popularity** y **male**, ambos de tipo **n**umérico.
+
+Exportemos esta red para que pueda ser leída por Gephi:
+```{r}
+igraph::write_graph(topsNet,file.path('data',"topsNetFull.graphml"),
+  format = "graphml")
+```
+
 
 Recordemos que nuestra red de Seattletonians:
 
@@ -84,6 +96,13 @@ topsNet_giant=induced_subgraph(topsNet, nodes_Subset)
 # ahora:
 summary(topsNet_giant)
 ```
+
+Exportemos esta sub red para que pueda ser leída por Gephi:
+```{r}
+igraph::write_graph(topsNet_giant,file.path('data',"topsNet_giant.graphml"),
+  format = "graphml")
+```
+
 Veamos algunos valores importantes:
 
 * ¿Qué tan cerca está esta red _strongly_ connected de ser una red **complete**?
@@ -121,6 +140,14 @@ assortativity(topsNet_giant, values=V(topsNet_giant)$male, directed = T)
 ```{r}
 assortativity(topsNet_giant, values=V(topsNet_giant)$popularity, directed = T)
 ```
+<div class="alert alert-warning" role="alert">
+## Usando Gephi
+
+Abramos **topsNet_giant.graphml**
+</div>
+
+
+
 Para saber si esta red tiene comunidades, hay que explorar la presencia de cliques.
 
 # En busca de comunidades
@@ -133,13 +160,14 @@ Como nuestra red la creamos con igraph, hay que convertirlo a gafo de statnet:
 
 ```{r}
 topsNet_giant_net <- intergraph::asNetwork(topsNet_giant)
-topsNet_giant_net
 
+# ya es de statnet:
+topsNet_giant_net
 ```
 
 Nuestro propósito aquí es saber si hay cliques:
 
-```{r}
+```{r, message=FALSE}
 library(statnet)
 census <- clique.census(topsNet_giant_net)
 # aqui vemos
@@ -151,6 +179,7 @@ census$clique.count
 La cantidad de filas nos dice los tamaños de los cliques:
 
 -  Ningun clique de tamaño 1:
+
 ```{r}
 census$clique.count[1,1]
 ```
@@ -182,6 +211,7 @@ l=layout_with_fr(topsNet_giant)
 plot(topsNet_giant,layout=l,edge.arrow.size=1,vertex.label='',
      edge.color=ifelse(edge_betweenness(topsNet_giant)>40,'red','grey90'))
 ```
+
 El trabajo sería ir eliminando vertices hasta quedarse con la 'mejor' partición. Esto lo hace directamente el algoritmo the Girvan-Newman:
 
 ```{r, warning=FALSE}
@@ -305,7 +335,17 @@ Un poco de traducción:
 
 Es decir: **rachelerman** ocupa 35 veces rol de _Coordinador_, 15 rol de _Consultor_,  85 de _Portero_, 100 de _Representante_, y  80 _liasion_.
 
+Podemos guardar los atributos creados, así como los edges:
 ```{r}
-as_data_frame(topsNet_giant,what='vertices')
-as_data_frame(topsNet_giant,what='edges')
+nodos_atrib=as_data_frame(topsNet_giant,what='vertices')
+enlaces=as_data_frame(topsNet_giant,what='edges')
+write.csv(nodos_atrib,file.path('data',"Seattle_giant_nodos.csv"),row.names = F)
+write.csv(enlaces,file.path('data',"Seattle_giant_enlaces.csv"),row.names = F)
 ```
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_4/blob/main/pics/gephi_spline.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 2. Menú de Splines en Gephi. 
+ </figcaption>
+ Fuente: Autor.
+</figure>
