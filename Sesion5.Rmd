@@ -118,11 +118,7 @@ farthest_vertices(topsNet_giant)
 ```{r}
 reciprocity(topsNet_giant)
 ```
-* ¿Qué tan probable es que dos nodos con un nodo en común también estén conectados?
 
-```{r}
-transitivity(topsNet_giant)
-```
 * ¿Qué tanta homofilia hay en la red?
 
 - Hacia los más conectados:
@@ -143,20 +139,79 @@ assortativity(topsNet_giant, values=V(topsNet_giant)$popularity, directed = T)
 <div class="alert alert-warning" role="alert">
 ## Usando Gephi
 
-Abramos **topsNet_giant.graphml**
+Abramos **topsNet_giant.graphml**, y a continuación:
+
+1. Verifiquemos que tiene la misma cantidad de nodos, enlaces; y que es de tipo dirigido.
+2. Calculemos la densidad, su diámetro. 
+3. Comparemos
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/gephi1.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 1. Resultados para Densidad y Diametro. 
+ </figcaption>
+ Fuente: Autor.
+</figure>
 </div>
+<br></br>
 
-
-
-Para saber si esta red tiene comunidades, hay que explorar la presencia de cliques.
 
 # En busca de comunidades
 
+ Un paso inicial es saber qué tan alto es el coeficiente de clusterización:
+
+* ¿Qué tan probable es que dos nodos con un nodo en común también estén conectados?
+
+a. El promedio de cada nodo:
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/LClusteringCoeff.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 2. Coeficiente de Clusterización como promedio local. 
+ </figcaption>
+ Fuente: Antonio Y, Indratno SW, Saputro SW(2021) Pricing of cyber insurance premiums usinga Markov-based dynamic model with clusteringstructure.
+</figure>
+<br></br>
+
+```{r}
+transitivity(as.undirected(topsNet_giant,mode='collapse'),type = "localaverage")
+```
+b. El promedio de la red:
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/GClusteringCoeff.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 3. Coeficiente de Clusterización global. 
+ </figcaption>
+ Fuente: Chalancon, G., Kruse, K., Babu, M.M. (2013). Clustering Coefficient.
+</figure>
+<br></br>
+
+
+```{r}
+transitivity(as.undirected(topsNet_giant,mode='collapse'),type = "global")
+```
+
+
+Aquí **igraph** ha implementado el algoritmo sólo para el caso no dirigido. Por lo que probablemente este valor sea mayor al caso dirigido. Con un valor mayor a 0.5, podemos asumir que se puede encontrar clusters.
+
+<div class="alert alert-warning" role="alert">
+## Usando Gephi
+
+Con el grafo actual (**topsNet_giant.graphml**), Calculemos el coeficiente de clusterización en Gephi y comparemos.
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/gephi2.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 4. Resultados para Coeficiente de clusterización. 
+ </figcaption>
+ Fuente: Autor.
+</figure>
+</div>
+<br></br>
+<br></br>
+
 ### El Clique
 
-El clique es un conjunto de nodos donde todos pueden conectarse con todos. Para este caso, usarameos la librería **statnet**.
+Para darle más soporte a nuestra búsqueda de comunidades, hay que explorar la presencia de cliques.El clique es un conjunto de nodos donde todos pueden conectarse con todos. Para este caso, usarameos la librería **statnet**.
 
-Como nuestra red la creamos con igraph, hay que convertirlo a gafo de statnet:
+Como nuestra red la creamos con _igraph_, hay que convertirlo a grafo de _statnet_:
 
 ```{r}
 topsNet_giant_net <- intergraph::asNetwork(topsNet_giant)
@@ -176,7 +231,7 @@ census$clique.count
 ```
 
 
-La cantidad de filas nos dice los tamaños de los cliques:
+La cantidad de filas nos dice los tamaños de los **cliques máximales**, es decir, un clique que no se puede ampliar incluyendo un nodo adyacente más (no es un subconjunto de un camarilla más grande):
 
 -  Ningun clique de tamaño 1:
 
@@ -193,7 +248,13 @@ census$clique.count[2,1]
 ```{r}
 census$clique.count[9,1]
 ```
-
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/maximalCl.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 5. Cliques máximales y no maximales. 
+ </figcaption>
+ Fuente: math.stackexchange.com.
+</figure>
+<br></br>
 
 Si hay cliques, se sospecha la presencia de comunidades. 
 
@@ -274,24 +335,54 @@ l=layout_with_kk(topsNet_giant)
 plot(topsNet_giant_LV,topsNet_giant,layout=l,vertex.label='',edge.arrow.size=.2)
 ```
 
+
+<div class="alert alert-warning" role="alert">
+## Usando Gephi
+
+Con el grafo actual (**topsNet_giant.graphml**), calculemos comunidades con la función **Modularidad** de Gephi (usa la técnica Louvain) . Notemos las diferencias (particiones, modularidad, membresía).
+
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/gephi2.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 6. Resultados para cálculo de comunidades. 
+ </figcaption>
+ Fuente: Autor.
+</figure>
+</div>
+<br></br>
+<br></br>
+
+
 # Revelando roles
 
 ## Agujeros Estructurales
 
-Un tema clave es encontrar, en medio de todos los nodos, aquellos cuya posición y patrón de conexiones nos revele que tienen mejores condiciones para facilitar o restringir el flujo que se traslada por la red. Por ejemplo, podemos calcular cos tres nodes más claves siguiendo esa idea:
+Un tema clave es encontrar, en medio de todos los nodos, aquellos cuya posición y patrón de conexiones nos revele que tienen mejores condiciones para facilitar o restringir el flujo que se traslada por la red. Nótese en la Figura 7 la presencia de agujeros, y la emergencia de nodos que median el flujo entre subredes.
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/holes.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 7. Agujeros Estructurales. 
+ </figcaption>
+ Fuente: Kleinberg, Suri, Tardos & Wexler (n.d.). Strategic Network Formation With Structural Holes.
+</figure>
+</div>
+<br></br>
+<br></br>
+
+Por ejemplo, podemos calcular los tres nodos más claves siguiendo esa idea:
 
 ```{r}
 #install.packages("influenceR", dependencies = TRUE)
 
 influenceR::keyplayer(topsNet_giant,3)
 ```
-Alternativamente, podemos revelar quienes tienen menos restricciones en la red para lo mismo:facilitar o restringir el flujo que se traslada por la red. 
+Alternativamente, podemos revelar quiénes tienen menos restricciones en la red para lo mismo:facilitar o restringir el flujo que se traslada por la red. 
 
 ```{r}
-sort(constraint(topsNet_giant))
+igraph::constraint(topsNet_giant)
 ```
 
-Así, sabiendo que hay agujeros estrucrurales, podemos animarnos a asignar roles de _brokerage_.
+Así, sabiendo que hay agujeros estructurales, podemos animarnos a asignar roles de _brokerage_.
 
 ## Brokerage
 
@@ -335,17 +426,115 @@ Un poco de traducción:
 
 Es decir: **rachelerman** ocupa 35 veces rol de _Coordinador_, 15 rol de _Consultor_,  85 de _Portero_, 100 de _Representante_, y  80 _liasion_.
 
-Podemos guardar los atributos creados, así como los edges:
-```{r}
-nodos_atrib=as_data_frame(topsNet_giant,what='vertices')
-enlaces=as_data_frame(topsNet_giant,what='edges')
-write.csv(nodos_atrib,file.path('data',"Seattle_giant_nodos.csv"),row.names = F)
-write.csv(enlaces,file.path('data',"Seattle_giant_enlaces.csv"),row.names = F)
-```
+
+<div class="alert alert-warning" role="alert">
+## Usando UCINET
+
+Creemos el archivo de enlaces (edgelist) desde R:
+
+* enlaces=as_data_frame(topsNet_giant,what='edges')
+<br></br>
+* write.csv(enlaces,file.path('data',"Seattle_giant_enlaces.csv"),row.names = F)
+
+Puede descargar ese archivo desde la carpeta de datos en este momento.
+
+Luego, desde Gephi, vayamos al Laboratorio de datos y descarguemos en CSV los atributos calculados por nodo, llame a ese archivo **Seattle_giant_nodos.csv**.
 
 <figure>
-<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_4/blob/main/pics/gephi_spline.png?raw=true" style="width:50%">
-<figcaption align = "left"> Figura 2. Menú de Splines en Gephi. 
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/gephi4.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 8. Guardando atributos desde Gephi (I). 
  </figcaption>
  Fuente: Autor.
 </figure>
+
+<br></br>
+
+Antes de crearlo, cerciorese de sólo seleccionar dos columnas, la que tiene el nombre, y la que tiene la partición por modularidad (Louvain). Sobretodo, evite guardar _ID_ y _LABEL_, tal como se indica en la Figura 9.
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/gephi5.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 9. Guardando atributos desde Gephi (II). 
+ </figcaption>
+ Fuente: Autor.
+</figure>
+
+
+Ahora abrimos UCINET, y abrimos estos archivos desde el **DL Editor**:
+
+* **Seattle_giant_enlaces.csv**. Guardemoslo como un _edgelist_ en UCINET, tal como se indica en la Figura 10.
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/uci1.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 10. Guardando edgelist en UCINET. 
+ </figcaption>
+ Fuente: Autor.
+</figure>
+
+<br></br>
+
+* **Seattle_giant_nodos.csv**. Guardemoslo como un _matrix_ en UCINET, tal como se indica en la Figura 11.
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/uci2.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 11. Guardando atributos de los nodos en UCINET. 
+ </figcaption>
+ Fuente: Autor.
+</figure>
+
+
+Para calcular el **constraint** de los **agujeros estructurales**, sigamos los pasos indicados en las Figuras 12 y 13.
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/uci31.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 12. Métricas de los agujeros estructurales (I). 
+ </figcaption>
+ Fuente: Autor.
+</figure>
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/uci32.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 13. Métricas de los agujeros estructurales (II).
+ </figcaption>
+ Fuente: Autor.
+</figure>
+
+
+Para calcular los roles de brokerage, sigamos los pasos indicados en las Figuras 14 y 15.
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/uci41.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 14. Métricas de los brokerage (II).
+ </figcaption>
+ Fuente: Autor.
+</figure>
+
+<figure>
+<img src="https://github.com/MAGALLANESJoseManuel/MGPIT_Pol748_Redes_5/blob/main/pics/uci42.png?raw=true" style="width:50%">
+<figcaption align = "left"> Figura 15. Métricas de los  brokerage (II).
+ </figcaption>
+ Fuente: Autor.
+</figure>
+
+
+
+</div>
+<br></br>
+Recuerda que el brokerage se ha calculado con **tres** particiones, según Gephi, y que en R lo hicimos con **cuatro** particiones.
+
+<div class="alert-success">
+
+## Ejercicio
+
+Para este ejercicio trabaje con **toda**  la red de los innovadores de Seattle (no sólo con el mayor componente).
+
+1. Importar el archivo **topsNetFull.graphml** en Gephi (está en su carpeta _data_); a esa red calcular las comunidades y exportar esos datos para UCINET.
+2. Importar en UCINET la matriz de adyacencia **seattleTop_adjMx.csv**  (está en su carpeta _data_); a esa matriz convertirla en red de UCINET.
+3. Calcule los brokerage de esta red, y comente las diferencias más resaltantes que encuentra en relación a los roles brokerage antes calculados en UCINET para la red del mayor componente.
+
+
+_Prepara tu respuesta con texto e imagenes de lo obtenido en un GoogleDoc_.
+
+</div>
+
+
+
